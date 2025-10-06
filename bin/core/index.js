@@ -501,7 +501,7 @@ class FfmpegHelper {
             // RTMP 流处理
             if (this.INPUT_FILE.startsWith('rtmp://')) {
                 // RTMP 流优化参数（不使用 -rtsp_transport，因为这是RTSP专用参数）
-                this.ffmpegCmd.inputOption('-buffer_size', '1024000') // 增加缓冲区大小
+                this.ffmpegCmd.inputOption('-rw_timeout', '5000000')  // 设置读写超时时间（微秒）
                 this.ffmpegCmd.inputOption('-probesize', '32M')       // 增加探测大小
                 this.ffmpegCmd.inputOption('-analyzeduration', '0')   // 减少分析时间
                 return
