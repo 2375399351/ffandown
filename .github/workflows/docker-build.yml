@@ -20,11 +20,11 @@ jobs:
     # 步骤表示将作为作业的一部分执行的任务序列
     steps:
       # 在 $GITHUB_WORKSPACE 下检出您的仓库，以便作业可以访问它
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       # 设置Docker Buildx，用于Docker构建
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v3
 
       # 设置Node.js环境
       - name: Setup Node
@@ -40,7 +40,7 @@ jobs:
       - name: Build Release
         run: npm run pkg
 
-      # 构建内置FFmpeg的Docker镜像（AMD64架构）- 仅构建，不推送
+      # 构建内置FFmpeg的Docker镜像（AMD64架构）- 构建并保存为tar文件
       - name: Build Jrottenberg-ffmpeg Docker image
         uses: docker/build-push-action@v3
         with:
@@ -49,8 +49,9 @@ jobs:
             push: false  # 不推送到任何平台
             platforms: linux/amd64
             tags: h55205l/ffandown:jrottenberg-ffmpeg-${{ github.event.inputs.version }}
+            outputs: type=docker,dest=./ffandown-jrottenberg-ffmpeg-${{ github.event.inputs.version }}.tar
 
-      # 构建标准Docker镜像（AMD64架构）- 仅构建，不推送
+      # 构建标准Docker镜像（AMD64架构）- 构建并保存为tar文件
       - name: Build Docker image
         uses: docker/build-push-action@v3
         with:
@@ -59,3 +60,19 @@ jobs:
             push: false  # 不推送到任何平台
             platforms: linux/amd64
             tags: h55205l/ffandown:${{ github.event.inputs.version }}
+            outputs: type=docker,dest=./ffandown-${{ github.event.inputs.version }}.tar
+
+      # 上传Docker镜像文件作为Artifacts，可在Actions界面下载
+      - name: Upload Jrottenberg-ffmpeg Docker Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffandown-jrottenberg-ffmpeg-${{ github.event.inputs.version }}
+          path: ffandown-jrottenberg-ffmpeg-${{ github.event.inputs.version }}.tar
+          retention-days: 30
+
+      - name: Upload Standard Docker Image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffandown-${{ github.event.inputs.version }}
+          path: ffandown-${{ github.event.inputs.version }}.tar
+          retention-days: 30
