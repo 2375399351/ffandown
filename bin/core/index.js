@@ -33,20 +33,11 @@ class FfmpegHelper {
     hardwareAccel = null // 硬件加速器
     hwAccelInfo = null // 硬件加速器信息
     systemInfo = null
-    customFfmpegArgs = null // 自定义FFmpeg参数
     constructor (options) {
         if (options?.THREADS) this.THREADS = options.THREADS
         this.HEADERS = []
         this.downloadedBytes = 0
         this.collectSystemInfo()
-    }
-
-    /**
-     * @description 设置自定义FFmpeg参数
-     * @param {string} customArgs 自定义FFmpeg参数
-     */
-    setCustomFfmpegArgs(customArgs) {
-        this.customFfmpegArgs = customArgs
     }
 
     /**
@@ -567,27 +558,6 @@ class FfmpegHelper {
      */
     setOutputOption() {
         try {
-            // 如果有自定义FFmpeg参数，则使用自定义参数
-            if (this.customFfmpegArgs) {
-                log.info('Using custom FFmpeg arguments')
-                // 解析自定义参数并应用到FFmpeg命令
-                const customArgs = this.customFfmpegArgs.split(' ').filter(arg => arg.trim())
-                customArgs.forEach(arg => {
-                    if (arg.startsWith('-')) {
-                        // 处理带值的参数
-                        const nextArg = customArgs[customArgs.indexOf(arg) + 1]
-                        if (nextArg && !nextArg.startsWith('-')) {
-                            this.ffmpegCmd.outputOptions(`${arg} ${nextArg}`)
-                        } else {
-                            this.ffmpegCmd.outputOptions(arg)
-                        }
-                    }
-                })
-                // 设置输出文件
-                this.ffmpegCmd.output(this.OUTPUT_FILE)
-                return
-            }
-
             // 设置线程数
             if (this.THREADS) {
                 this.ffmpegCmd.outputOptions([
