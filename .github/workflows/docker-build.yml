@@ -1,0 +1,61 @@
+# Docker镜像构建工作流
+name: Docker Build
+
+# 触发条件：手动触发工作流
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（例如：v1.0.0）'
+        required: true
+        type: string
+
+# 工作流由一个或多个可以顺序或并行运行的作业组成
+jobs:
+  # 此工作流包含一个名为"docker-build"的作业
+  docker-build:
+    # 作业将在其上运行的运行器类型
+    runs-on: ubuntu-latest
+
+    # 步骤表示将作为作业的一部分执行的任务序列
+    steps:
+      # 在 $GITHUB_WORKSPACE 下检出您的仓库，以便作业可以访问它
+      - uses: actions/checkout@v2
+
+      # 设置Docker Buildx，用于Docker构建
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      # 设置Node.js环境
+      - name: Setup Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '14.18.3'
+
+      # 安装项目依赖
+      - name: Install Dependencies
+        run: npm install
+
+      # 构建发布版本（使用pkg打包为可执行文件）
+      - name: Build Release
+        run: npm run pkg
+
+      # 构建内置FFmpeg的Docker镜像（AMD64架构）- 仅构建，不推送
+      - name: Build Jrottenberg-ffmpeg Docker image
+        uses: docker/build-push-action@v3
+        with:
+            context: ./
+            file: Dockerfile-jrottenberg-ffmpeg  # 使用内置FFmpeg的Dockerfile
+            push: false  # 不推送到任何平台
+            platforms: linux/amd64
+            tags: h55205l/ffandown:jrottenberg-ffmpeg-${{ github.event.inputs.version }}
+
+      # 构建标准Docker镜像（AMD64架构）- 仅构建，不推送
+      - name: Build Docker image
+        uses: docker/build-push-action@v3
+        with:
+            context: ./
+            file: Dockerfile  # 使用标准Dockerfile
+            push: false  # 不推送到任何平台
+            platforms: linux/amd64
+            tags: h55205l/ffandown:${{ github.event.inputs.version }}

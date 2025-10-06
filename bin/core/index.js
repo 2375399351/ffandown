@@ -488,10 +488,19 @@ class FfmpegHelper {
      */
     setInputOption () {
         try {
-            // rtmp/rtsp 直播无法通过该方式设置
-            if (['rtsp://', 'rtmp://'].some(prefix => this.INPUT_FILE.startsWith(prefix))) {
+            // RTSP 流处理
+            if (this.INPUT_FILE.startsWith('rtsp://')) {
                 // RTSP 流优化参数
                 this.ffmpegCmd.inputOption('-rtsp_transport', 'tcp')  // 使用 TCP 传输，更稳定
+                this.ffmpegCmd.inputOption('-buffer_size', '1024000') // 增加缓冲区大小
+                this.ffmpegCmd.inputOption('-probesize', '32M')       // 增加探测大小
+                this.ffmpegCmd.inputOption('-analyzeduration', '0')   // 减少分析时间
+                return
+            }
+            
+            // RTMP 流处理
+            if (this.INPUT_FILE.startsWith('rtmp://')) {
+                // RTMP 流优化参数（不使用 -rtsp_transport，因为这是RTSP专用参数）
                 this.ffmpegCmd.inputOption('-buffer_size', '1024000') // 增加缓冲区大小
                 this.ffmpegCmd.inputOption('-probesize', '32M')       // 增加探测大小
                 this.ffmpegCmd.inputOption('-analyzeduration', '0')   // 减少分析时间

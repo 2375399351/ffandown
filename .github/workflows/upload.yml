@@ -1,110 +1,130 @@
+# 持续集成工作流名称
 name: CI
 
+# 触发条件：当推送标签时触发（标签格式为 v*.*.*）
 on:
   push:
     tags:
       - 'v*.*.*'
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+# 工作流由一个或多个可以顺序或并行运行的作业组成
 jobs:
-  # This workflow contains a single job called "build"
+  # 此工作流包含一个名为"build"的作业
   build:
-    # The type of runner that the job will run on
+    # 作业将在其上运行的运行器类型
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    # 步骤表示将作为作业的一部分执行的任务序列
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      # 在 $GITHUB_WORKSPACE 下检出您的仓库，以便作业可以访问它
       - uses: actions/checkout@v2
 
+      # 设置QEMU模拟器，用于跨平台Docker构建
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
 
+      # 设置Docker Buildx，用于多平台Docker构建
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-
-      # Runs a single command using the runners shell
+      # 设置Node.js环境
       - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: '14.18.3'
 
-      # Runs a set of commands using the runners shell
+      # 安装项目依赖
       - name: Install Dependencies
         run: npm install
 
+      # 构建发布版本（使用pkg打包为可执行文件）
       - name: Build Release
         run: npm run pkg
 
+      # 提取标签名称并设置为环境变量
       - name: Extract tag name
         id: tag_name
         run: echo "TAG=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
+      # 创建GitHub Release并上传构建产物
       - name: Release 
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: "dist/**"
+          files: "dist/**"  # 上传dist目录下的所有文件
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN }}
 
+      # 登录到Docker Hub
       - name: Login to Docker Hub
         uses: docker/login-action@v1
         with:
             username: ${{ secrets.DOCKER_USERNAME }}
             password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # 准备内置FFmpeg的Docker标签
       - name: Prepare Inner FFmpeg Docker Tags
         id: docker_inner_ffmpeg_tags
         run: |
+              # 如果是Beta版本，使用带版本号的标签
               if [[ "${{ env.TAG }}" == *Beta* ]]; then
                 echo "::set-output name=tags::h55205l/ffandown:jrottenberg-ffmpeg-${{ env.TAG }}"
               else
+                # 正式版本使用固定标签
                 echo "::set-output name=tags::h55205l/ffandown:jrottenberg-ffmpeg"
               fi
 
+      # 构建并推送内置FFmpeg的Docker镜像（AMD64架构）
       - name: Build And Push Jrottenberg-ffmpeg Docker image
         uses: docker/build-push-action@v3
         with:
             context: ./
-            file: Dockerfile-jrottenberg-ffmpeg
+            file: Dockerfile-jrottenberg-ffmpeg  # 使用内置FFmpeg的Dockerfile
             push: true
             platforms: linux/amd64
             tags: ${{ steps.docker_inner_ffmpeg_tags.outputs.tags }}
 
+      # 准备标准Docker标签
       - name: Prepare Docker Tags
         id: docker_tags
         run: |
+              # 如果是Beta版本，使用带版本号的标签
               if [[ "${{ env.TAG }}" == *Beta* ]]; then
                 echo "::set-output name=tags::h55205l/ffandown:${{ env.TAG }}"
               else
+                # 正式版本同时使用latest和版本号标签
                 echo "::set-output name=tags::h55205l/ffandown:latest,h55205l/ffandown:${{ env.TAG }}"
               fi
 
+      # 构建并推送标准Docker镜像（AMD64架构）
       - name: Build And Push Docker image
         uses: docker/build-push-action@v3
         with:
             context: ./
-            file: Dockerfile
+            file: Dockerfile  # 使用标准Dockerfile
             push: true
             platforms: linux/amd64
             tags: ${{ steps.docker_tags.outputs.tags }}
 
+      # 准备ARM64架构的Docker标签
       - name: Prepare Arm Docker Tags
         id: docker_arm_tags
         run: |
+              # 如果是Beta版本，使用带版本号的ARM64标签
               if [[ "${{ env.TAG }}" == *Beta* ]]; then
                 echo "::set-output name=tags::h55205l/ffandown:arm64-${{ env.TAG }}"
               else
+                # 正式版本同时使用arm64和带版本号的标签
                 echo "::set-output name=tags::h55205l/ffandown:arm64,h55205l/ffandown:arm64-${{ env.TAG }}"
               fi
 
+      # 构建并推送ARM64架构的Docker镜像
       - name: Build And Push Arm64 Docker image
         uses: docker/build-push-action@v3
         with:
             context: ./
-            file: Dockerfile-linux-arm
+            file: Dockerfile-linux-arm  # 使用ARM64专用的Dockerfile
             push: true
             platforms: linux/arm64
             tags: ${{ steps.docker_arm_tags.outputs.tags }}
+
