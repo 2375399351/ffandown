@@ -36,9 +36,9 @@ jobs:
       - name: Install Dependencies
         run: npm install
 
-      # 构建发布版本（使用pkg打包为可执行文件）
-      - name: Build Release
-        run: npm run pkg
+      # 构建发布版本（使用pkg打包为可执行文件）- 暂时跳过
+      # - name: Build Release
+      #   run: npm run pkg
 
       # 构建内置FFmpeg的Docker镜像（AMD64架构）- 构建并保存为tar文件
       - name: Build Jrottenberg-ffmpeg Docker image
