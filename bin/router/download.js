@@ -49,6 +49,59 @@ async function createDonwloadMission (oimi, options) {
 }
 
 /**
+ * @description create advanced download mission with custom FFmpeg commands
+ * @param {Object} oimi 
+ * @param {Object} options 
+ */
+async function createAdvancedDownloadMission (oimi, options) {
+    const { url, name, dir, audioUrl, enableTimeSuffix, useragent, headers, customFfmpegArgs } = options
+    log.info(`Create advanced download mission: ${JSON.stringify(options, null, 2)}`)
+    
+    // 获取文件名和路径
+    const { fileName, filePath } = oimi.getDownloadFilePathAndName(name, dir, 'mkv', enableTimeSuffix)
+    
+    const mission = { 
+        uid: Utils.uuidv4(),
+        name: fileName,
+        url,
+        status: '0',  
+        filePath,
+        dir,
+        percent: 0,
+        message: '',
+        useragent,
+        preset: 'custom', // 标记为自定义模式
+        outputformat: 'custom', // 标记为自定义模式
+        headers,
+        audioUrl: audioUrl || '',
+        customFfmpegArgs, // 存储自定义FFmpeg参数
+        isAdvanced: true, // 标记为高级任务
+    }
+    
+    // 检查是否超过最大下载任务数
+    if (oimi.missionList.length >= oimi.maxDownloadNum) {
+        throw new Error(i18n._('max_download_num'))
+    }
+    
+    // 创建FFmpegHelper实例，使用自定义参数
+    const ffmpegHelper = new (require('../core/index'))({
+        THREADS: oimi.thread
+    })
+    
+    // 设置自定义FFmpeg参数
+    ffmpegHelper.setCustomFfmpegArgs(customFfmpegArgs)
+    
+    // 开始下载任务
+    await oimi.startDownload({ 
+        mission, 
+        ffmpegHelper, 
+        outputformat: 'custom', 
+        preset: 'custom', 
+        headers 
+    }, true)
+}
+
+/**
  * @description create download router
  * @returns 
  */
@@ -108,6 +161,55 @@ function createDownloadRouter (oimi) {
             }
         }
     })
+
+    // 高级新建任务 - 支持自定义FFmpeg命令
+    downloadRouter.post('/advanced', [jsonParser, validate([
+        body('name').optional().isString(),
+        body('url').notEmpty().withMessage('url must be a valid URL'),
+        body('audioUrl').optional().isString().withMessage('audioUrl must be a valid URL'),
+        body('useragent').optional().isString().withMessage('useragent must be a string'),
+        body('enableTimeSuffix').optional().isBoolean().withMessage('enableTimeSuffix must be a boolean'),
+        body('headers').optional().isArray().withMessage('headers must be an array'),
+        body('customFfmpegArgs').isString().notEmpty().withMessage('customFfmpegArgs is required for advanced mode'),
+    ])], async (req, res) => {
+        let { name, url, useragent, dir, audioUrl, enableTimeSuffix, headers, customFfmpegArgs } = req.body
+        // url 可能为多链接，这里进行处理
+        url = Utils.getRealUrl(url)
+        if (!url) {
+            res.send({ code: 1, message: i18n._('query_error') })
+        } else {
+            try {
+                if (Array.isArray(url)) {
+                    for (const urlItem of url) {
+                        createAdvancedDownloadMission(oimi, {
+                            url: urlItem, 
+                            dir, 
+                            audioUrl,
+                            enableTimeSuffix, 
+                            useragent, 
+                            headers,
+                            customFfmpegArgs,
+                        })
+                    }
+                } else {
+                    createAdvancedDownloadMission(oimi, {
+                        url,
+                        name, 
+                        dir,
+                        audioUrl,
+                        enableTimeSuffix,
+                        useragent,
+                        headers,
+                        customFfmpegArgs,
+                    })
+                }
+                res.send({ code: 0, message: `${url}: ${i18n._('create_success')}` })
+            } catch (e) {
+                res.send({ code: 1, message: String(e) })
+            }
+        }
+    })
+
     // get download list
     downloadRouter.get('/list', validate([
         query('current').notEmpty().withMessage('current is required'),
